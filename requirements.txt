@@ -1,7 +1,7 @@
 flask
 torch
 torchvision
-pillow
+Pillow
+requests
 ultralytics
-gunicorn
 pandas
