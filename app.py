@@ -20,30 +20,49 @@ if os.path.exists(LABEL_ENCODER_PATH):
     with open(LABEL_ENCODER_PATH, 'rb') as f:
         label_encoder = pickle.load(f)
 
-# === CNN Model for Image Classification (MODEL 2) ===
-class MyModel(nn.Module):
-    def __init__(self):
-        super(MyModel, self).__init__()
-        self.features = nn.Sequential(
-            nn.Conv2d(3, 16, kernel_size=3, stride=1, padding=1),
+# === Model Residual untuk Klasifikasi Penyakit ===
+class ResidualBlock(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.conv = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
+            nn.BatchNorm2d(out_channels),
             nn.ReLU(),
-            nn.MaxPool2d(2),
-            nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(2),
-            nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(2)
+            nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1),
+            nn.BatchNorm2d(out_channels)
         )
+        self.skip = nn.Conv2d(in_channels, out_channels, kernel_size=1) if in_channels != out_channels else nn.Identity()
+
+    def forward(self, x):
+        return torch.relu(self.conv(x) + self.skip(x))
+
+class MiniResNet(nn.Module):
+    def __init__(self, num_classes):
+        super().__init__()
+        self.layer1 = ResidualBlock(3, 32)
+        self.pool1 = nn.MaxPool2d(2)
+        self.layer2 = ResidualBlock(32, 64)
+        self.pool2 = nn.MaxPool2d(2)
+        self.layer3 = ResidualBlock(64, 128)
+        self.pool3 = nn.MaxPool2d(2)
+        self.layer4 = ResidualBlock(128, 128)
+        self.pool4 = nn.MaxPool2d(2)
+        self.layer5 = ResidualBlock(128, 128)
+        self.pool5 = nn.AdaptiveAvgPool2d((1, 1))
         self.classifier = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(64 * 28 * 28, 128),
+            nn.Linear(128, 128),
             nn.ReLU(),
-            nn.Linear(128, 2)
+            nn.Dropout(0.5),
+            nn.Linear(128, num_classes)
         )
 
     def forward(self, x):
-        x = self.features(x)
+        x = self.pool1(self.layer1(x))
+        x = self.pool2(self.layer2(x))
+        x = self.pool3(self.layer3(x))
+        x = self.pool4(self.layer4(x))
+        x = self.pool5(self.layer5(x))
         x = self.classifier(x)
         return x
 
