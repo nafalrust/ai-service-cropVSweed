@@ -5,3 +5,4 @@ Pillow
 requests
 ultralytics
 pandas
+scikit-learn
