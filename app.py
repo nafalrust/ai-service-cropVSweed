@@ -4,6 +4,8 @@ from torchvision import transforms
 from PIL import Image
 import io
 import os
+import requests
+from io import BytesIO
 
 # Tambahkan import YOLO jika model dari Ultralytics
 try:
@@ -63,6 +65,29 @@ def predict():
         result = int(predicted.item())
 
     return jsonify({'prediction': result})
+
+@app.route('/predict_url', methods=['POST'])
+def predict_url():
+    data = request.get_json()
+    image_url = data.get('image_url')
+    if not image_url:
+        return jsonify({'error': 'No image_url provided'}), 400
+
+    try:
+        response = requests.get(image_url)
+        response.raise_for_status()
+        img = Image.open(BytesIO(response.content)).convert('RGB')
+        input_tensor = preprocess(img).unsqueeze(0)  # batch size 1
+
+        with torch.no_grad():
+            output = model(input_tensor)
+            # Jika output logits, ambil argmax
+            _, predicted = torch.max(output, 1)
+            result = int(predicted.item())
+
+        return jsonify({'prediction': result})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
