@@ -5,14 +5,38 @@ from PIL import Image
 import io
 import os
 
+# Tambahkan import YOLO jika model dari Ultralytics
+try:
+    from ultralytics import YOLO
+except ImportError:
+    YOLO = None
+
 app = Flask(__name__)
 
-MODEL_PATH = "model.pt"  # ganti dengan path modelmu
+MODEL_PATH = "best_model6.pt"  # ganti dengan path modelmu
 
 model = None
 if os.path.exists(MODEL_PATH):
-    model = torch.load(MODEL_PATH, map_location=torch.device('cpu'))
-    model.eval()
+    try:
+        # Coba load sebagai model Ultralytics YOLO
+        if YOLO is not None:
+            model = YOLO(MODEL_PATH)
+        else:
+            # Fallback: load sebagai PyTorch model biasa
+            loaded = torch.load(MODEL_PATH, map_location=torch.device('cpu'), weights_only=False)
+            if isinstance(loaded, dict):
+                # Anda harus mendefinisikan arsitektur model di sini, contoh:
+                # from my_model import MyModel
+                # model = MyModel()
+                # model.load_state_dict(loaded['state_dict'])
+                # model.eval()
+                raise RuntimeError("Model file berisi state_dict. Silakan definisikan arsitektur model dan load state_dict.")
+            else:
+                model = loaded
+                model.eval()
+    except Exception as e:
+        model = None
+        print(f"Error loading model: {e}")
 
 # Preprocessing sesuai kebutuhan model
 preprocess = transforms.Compose([
@@ -41,4 +65,4 @@ def predict():
     return jsonify({'prediction': result})
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)
