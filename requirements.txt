@@ -3,6 +3,6 @@ torch
 torchvision
 Pillow
 requests
-ultralytics
+ultralytics==8.0.225
 pandas
 scikit-learn

@@ -14,6 +14,8 @@ app = Flask(__name__)
 
 # === Path & Config ===
 LABEL_ENCODER_PATH = "label_encoder.pkl"
+CNN_MODEL_PATH = "model_trained.pt"
+YOLO_MODEL_PATH = "best_model6.pt"
 
 # === Load Label Encoder ===
 label_encoder = None
@@ -64,8 +66,7 @@ class MiniResNet(nn.Module):
         x = self.pool3(self.layer3(x))
         x = self.pool4(self.layer4(x))
         x = self.pool5(self.layer5(x))
-        x = self.classifier(x)
-        return x
+        return self.classifier(x)
 
 # === Load Models ===  
 def load_model(path, is_cnn=True):
@@ -78,12 +79,15 @@ def load_model(path, is_cnn=True):
     else:
         return YOLO(path)
 
-
-model_cnn = load_model("model_trained.pt", is_cnn=True)
-model_yolo = load_model("best_model6.pt", is_cnn=False)
+model_cnn = load_model(CNN_MODEL_PATH, is_cnn=True)
+model_yolo = load_model(YOLO_MODEL_PATH, is_cnn=False)
 
 # === Transforms ===
-transform_common = transforms.Compose([transforms.Resize((256, 256)), transforms.ToTensor()])
+transform_common = transforms.Compose([
+    transforms.Resize((256, 256)),
+    transforms.ToTensor()
+])
+
 transform_cnn = transforms.Compose([
     transforms.Resize((256, 256)),
     transforms.ToTensor(),
@@ -104,7 +108,6 @@ def predict_cnn(image):
 
 # === YOLO Detection ===
 def predict_yolo(image):
-    import numpy as np
     image = image.convert('RGB')
     img_resized = transform_common(image)
     results = model_yolo(img_resized.unsqueeze(0))[0]
@@ -117,7 +120,6 @@ def predict_yolo(image):
             draw.rectangle([x1, y1, x2, y2], outline="red", width=2)
             draw.text((x1, y1), f"Class {int(cls)}: {conf:.2f}", fill="red")
 
-    
     img_io = BytesIO()
     image.save(img_io, 'PNG')
     img_io.seek(0)
@@ -177,6 +179,6 @@ def detect_weed_url():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# === Run Flask App ===
+# === Run Flask App (Hugging Face Spaces expects port 7860) ===
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=7860)
