@@ -1,19 +1,24 @@
+# Gunakan image dasar
 FROM python:3.10-slim
 
+# Install dependencies untuk OpenCV
+RUN apt-get update && apt-get install -y \
+    libgl1 \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
 WORKDIR /app
 
-# Install dependencies
+# Copy requirements dan install dependensi Python
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy source files
-COPY app.py .
-COPY model_entire.pt .
-COPY best_model6.pt .
-COPY label_encoder.pkl .
+# Salin semua file ke dalam container
+COPY . .
 
-# Expose Flask port
+# Buka port untuk Flask
 EXPOSE 5000
 
-# Jalankan Flask
+# Jalankan aplikasi
 CMD ["python", "app.py"]

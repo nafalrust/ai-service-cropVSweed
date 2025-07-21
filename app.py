@@ -8,6 +8,7 @@ import os
 import requests
 from io import BytesIO
 import pickle
+from ultralytics import YOLO
 
 app = Flask(__name__)
 
@@ -66,18 +67,19 @@ class MiniResNet(nn.Module):
         x = self.classifier(x)
         return x
 
-# === Load Models ===
+# === Load Models ===  
 def load_model(path, is_cnn=True):
-    loaded = torch.load(path, map_location=torch.device('cpu'))
     if is_cnn:
-        model = MyModel()
+        loaded = torch.load(path, map_location=torch.device('cpu'))
+        model = MiniResNet(num_classes=len(label_encoder.classes_))
         model.load_state_dict(loaded['state_dict'] if 'state_dict' in loaded else loaded)
+        model.eval()
+        return model
     else:
-        model = loaded  # YOLO typically doesn't need rewrap
-    model.eval()
-    return model
+        return YOLO(path)
 
-model_cnn = load_model("model_entire.pt", is_cnn=True)
+
+model_cnn = load_model("model_trained.pt", is_cnn=True)
 model_yolo = load_model("best_model6.pt", is_cnn=False)
 
 # === Transforms ===
@@ -108,10 +110,13 @@ def predict_yolo(image):
     results = model_yolo(img_resized.unsqueeze(0))[0]
 
     draw = ImageDraw.Draw(image)
-    for *box, conf, cls in results.tolist():
-        x1, y1, x2, y2 = map(int, box)
-        draw.rectangle([x1, y1, x2, y2], outline="red", width=2)
-        draw.text((x1, y1), f"Class {int(cls)}: {conf:.2f}", fill="red")
+    if results.boxes is not None:
+        for box in results.boxes.data.tolist():
+            x1, y1, x2, y2, conf, cls = box
+            x1, y1, x2, y2 = map(int, [x1, y1, x2, y2])
+            draw.rectangle([x1, y1, x2, y2], outline="red", width=2)
+            draw.text((x1, y1), f"Class {int(cls)}: {conf:.2f}", fill="red")
+
     
     img_io = BytesIO()
     image.save(img_io, 'PNG')
